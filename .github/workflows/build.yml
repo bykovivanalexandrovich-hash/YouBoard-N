@@ -1,25 +1,54 @@
 name: Build APK
+
 on:
   push:
   workflow_dispatch:
+
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
+
       - name: Unzip project
         run: unzip -q MaterialYouKeyboard.zip
-      - uses: actions/setup-java@v4
+
+      - name: Fix Gradle error
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path("MaterialYouKeyboard/app/build.gradle.kts")
+          s = p.read_text()
+
+          if "import java.net.URL" not in s:
+              s = "import java.net.URL\n" + s
+
+          s = s.replace("java.net.URL(", "URL(")
+
+          p.write_text(s)
+          print("Gradle fix applied!")
+          PY
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
-      - uses: gradle/actions/setup-gradle@v4
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 8.10.2
-      - name: Build
+
+      - name: Build APK
         run: gradle assembleDebug --no-daemon
         working-directory: MaterialYouKeyboard
-      - uses: actions/upload-artifact@v4
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
         with:
           name: MaterialYouKeyboard-debug
           path: MaterialYouKeyboard/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
